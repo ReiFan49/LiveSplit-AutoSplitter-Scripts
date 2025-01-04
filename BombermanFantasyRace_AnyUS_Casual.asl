@@ -171,7 +171,7 @@ gameTime {
 
   if (vars.raceIgnoreTimeDelta) {
     if (current.raceLapProgress == raceMaxLap && old.raceLapProgress == current.raceLapProgress - 1)
-      delta += 1;
+      delta -= 1;
     else
       delta = 0;
   }
