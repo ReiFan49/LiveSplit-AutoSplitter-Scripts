@@ -2,6 +2,10 @@
 
 This repository stores collection of LiveSplit Autosplitters.
 
+## Games
+
+- [Bomberman Fantasy Race (NTSC-U)](https://github.com/ReiFan49/LiveSplit-Autosplitter-Scripts/tree/psx/slus-00823) [PSX, SLUS-00823]
+
 ## Disclaimer
 
 These scripts are tested within some tests, bugs may still occur.
