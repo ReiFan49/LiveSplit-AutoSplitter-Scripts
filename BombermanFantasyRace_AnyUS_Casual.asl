@@ -205,8 +205,8 @@ split {
   int moneyRequired = 0;
   bool isClearBonus = false;
 
-  int previousClearFlags = old.userFlagUnlocked | (old.userFlagUnlockedMirror << 8);
-  int currentClearFlags = current.userFlagUnlocked | (current.userFlagUnlockedMirror << 8);
+  int previousClearFlags = old.userFlagCleared | (old.userFlagClearedMirror << 8);
+  int currentClearFlags = current.userFlagCleared | (current.userFlagClearedMirror << 8);
 
   if (game != null) {
     actualTrackID = current.raceTrackID | (current.raceTrackIsMirror ? 8 : 0);
