@@ -148,12 +148,12 @@ update {
 
 start {
   if (game != null && vars.SUPER_NOISY_VERBOSE) print("start check");
-  return old.isTitleScreen && current.gameMode == 0xff && current.userControlOnStr;
+  return current.gameMode == 0xff && current.userControlOnStr && old.isTitleScreen;
 }
 
 reset {
   if (game != null && vars.SUPER_NOISY_VERBOSE) print("reset check");
-  return current.isTitleScreen && current.gameMode == 0xff && !old.isTitleScreen;
+  return current.gameMode == 0xff && current.isTitleScreen && !old.isTitleScreen;
 }
 
 gameTime {
