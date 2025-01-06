@@ -9,6 +9,38 @@ startup {
 
   vars.SUPER_NOISY_VERBOSE = false;
 
+  /* CONSTANTS */
+  // TRACK CONSTANTS
+  vars.TR_CIRCUIT  = 0;
+  vars.TR_COASTER  = 1;
+  vars.TR_ISLE     = 2;
+  vars.TR_BAKUDAN  = 3;
+  vars.TR_EXPRESS  = 4;
+  vars.TR_DYNAMITE = 5;
+  vars.TR_CASTLE   = 6;
+  vars.TR_SPACEWAY = 7;
+
+  // TRACK BITS
+  vars.TRB_CIRCUIT  = 1 << vars.TR_CIRCUIT;
+  vars.TRB_COASTER  = 1 << vars.TR_COASTER;
+  vars.TRB_ISLE     = 1 << vars.TR_ISLE;
+  vars.TRB_BAKUDAN  = 1 << vars.TR_BAKUDAN;
+  vars.TRB_EXPRESS  = 1 << vars.TR_EXPRESS;
+  vars.TRB_DYNAMITE = 1 << vars.TR_DYNAMITE;
+  vars.TRB_CASTLE   = 1 << vars.TR_CASTLE;
+  vars.TRB_SPACEWAY = 1 << vars.TR_SPACEWAY;
+
+  // TRACK MIRROR BITS
+  vars.TRB_MCIRCUIT  =  vars.TRB_CIRCUIT << 8;
+  vars.TRB_MCOASTER  =  vars.TRB_COASTER << 8;
+  vars.TRB_MISLE     =     vars.TRB_ISLE << 8;
+  vars.TRB_MBAKUDAN  =  vars.TRB_BAKUDAN << 8;
+  vars.TRB_MEXPRESS  =  vars.TRB_EXPRESS << 8;
+  vars.TRB_MDYNAMITE = vars.TRB_DYNAMITE << 8;
+  vars.TRB_MCASTLE   =   vars.TRB_CASTLE << 8;
+  // CONSTANTS - END
+
+  /* Dynamic Finder */
   Func<IEnumerable<MemoryBasicInformation>, IntPtr> defaultFinder = (memoryPages) => IntPtr.Zero;
   vars.dynamicFinder = defaultFinder;
   vars.dynamicFinderTimer = new Stopwatch();
@@ -23,7 +55,7 @@ startup {
   vars.isDynamicAddressFound = false;
 
   vars.baseRAMAddress = IntPtr.Zero;
-  vars.splitCache = new HashSet<string>();
+  // Dynamic Finder - END
 }
 
 init {
@@ -59,10 +91,8 @@ init {
 }
 
 update {
-  if (version == "")
-    return false;
-
-  if (vars.isDynamicAddress) {
+  /* Functions */
+  Func<bool> funcUpdateDynamicAddress = () => {
     if (!vars.isDynamicAddressFound) {
       if(vars.dynamicFinderTimer.IsRunning && vars.dynamicFinderTimer.ElapsedMilliseconds <= 500)
         return false;
@@ -87,11 +117,64 @@ update {
       vars.isDynamicAddressFound = false;
       vars.baseRAMAddress = IntPtr.Zero;
     }
-  }
+
+    return true;
+  };
+
+  Func<int, bool> funcApplyBonusFlag = (actualTrackID) => {
+    if (current.raceTrackIsBonus && current.raceLapProgress == 1 && old.raceLapProgress == 0) {
+      print(string.Format("Pop the Bonus Flag for Track {0}", actualTrackID));
+      vars.bonusTrackFlag[actualTrackID] = false;
+
+      return true;
+    } else if (!current.raceTrackIsBonus && current.raceLapProgress == 3 && old.raceLapProgress == 2 && current.racePosition == 1) {
+      print(string.Format("Register Bonus Flag for Track {0}", actualTrackID));
+      vars.bonusTrackFlag[actualTrackID] = true;
+    }
+
+    return false;
+  };
+
+  Func<bool> funcCheckPreCastleNormal = () => {
+    int moneyRequired = 0;
+
+    if ((current.userFlagCleared & 0x3f) != 0x3f) return false;
+
+    if ((current.userFlagUnlocked &  vars.TRB_COASTER) == 0) moneyRequired +=  100;
+    if ((current.userFlagUnlocked &     vars.TRB_ISLE) == 0) moneyRequired +=  400;
+    if ((current.userFlagUnlocked &  vars.TRB_BAKUDAN) == 0) moneyRequired +=  900;
+    if ((current.userFlagUnlocked &  vars.TRB_EXPRESS) == 0) moneyRequired += 1500;
+    if ((current.userFlagUnlocked & vars.TRB_DYNAMITE) == 0) moneyRequired += 3000;
+    if ((current.userFlagUnlocked &   vars.TRB_CASTLE) == 0) moneyRequired += 4600;
+
+    if (settings["use_hyper_louie"] && ((current.userFlagRides & (1 << 4)) == 0)) moneyRequired += 8000;
+
+    var canUnlockCastleOld     = old.userCredit >= moneyRequired;
+    var canUnlockCastleCurrent = current.userCredit >= moneyRequired;
+    if(canUnlockCastleCurrent && !canUnlockCastleOld && moneyRequired > 0) {
+      vars.canUnlockCastleFlag = true;
+      return true;
+    }
+
+    return false;
+  };
+
+  vars.fUpdateDynamicAddress = funcUpdateDynamicAddress;
+  vars.fOnClearRace = funcApplyBonusFlag;
+  vars.fOnUnlockableNormalCastle = funcCheckPreCastleNormal;
+  // FUNCTIONS - END
+
+  if (version == "")
+    return false;
+
+  if (vars.isDynamicAddress)
+    vars.fUpdateDynamicAddress();
 
   if (vars.baseRAMAddress == IntPtr.Zero)
     return false;
 
+  // Not an accurate way to describe Title Screen.
+  // This value also set anywhere else like during the race.
   current.isTitleScreen = memory.ReadValue<byte>((IntPtr)vars.baseRAMAddress + 0x014971a) != 0;
 
   current.racePosition = memory.ReadValue<byte>((IntPtr)vars.baseRAMAddress + 0x0100f6);
@@ -127,18 +210,16 @@ update {
   current.gameMode = memory.ReadValue<byte>((IntPtr)vars.baseRAMAddress + 0x1487e0);
   
   current.userCredit = memory.ReadValue<uint>((IntPtr)vars.baseRAMAddress + 0x14873c);
-  current.userFlagUnlocked = memory.ReadValue<byte>((IntPtr)vars.baseRAMAddress + 0x148731);
-  current.userFlagUnlockedMirror = memory.ReadValue<byte>((IntPtr)vars.baseRAMAddress + 0x148732);
-  current.userFlagCleared = memory.ReadValue<byte>((IntPtr)vars.baseRAMAddress + 0x148733);
-  current.userFlagClearedMirror = memory.ReadValue<byte>((IntPtr)vars.baseRAMAddress + 0x148734);
+  current.userFlagUnlocked = memory.ReadValue<short>((IntPtr)vars.baseRAMAddress + 0x148731);
+  current.userFlagCleared = memory.ReadValue<short>((IntPtr)vars.baseRAMAddress + 0x148733);
   current.userFlagRides = memory.ReadValue<ushort>((IntPtr)vars.baseRAMAddress + 0x148736);
 
-  current.userIsUnlockedBomberCastle = (current.userFlagUnlocked & (1 << 6)) != 0;
-  if ((current.userFlagCleared & (1 << 6)) != 0)
+  current.userIsUnlockedBomberCastle = (current.userFlagUnlocked & vars.TRB_CASTLE) != 0;
+  if ((current.userFlagCleared & vars.TRB_CASTLE) != 0)
     current.userIsClearedBomberCastle = true;
   else
     current.userIsClearedBomberCastle = (
-      current.raceTrackID == 6 &&
+      current.raceTrackID == vars.TR_CASTLE &&
       !current.raceTrackIsMirror &&
       !current.raceTrackIsBonus &&
       current.racePosition == 1 &&
@@ -166,8 +247,6 @@ gameTime {
     delta = old.raceLapTime - current.raceLapTime;
   else
     delta = current.raceTotalTime - old.raceTotalTime;
-
-  // print(string.Format("Bonus Flag: {0} | Time: {1} {2} | Diff: {3} | Anchor: {4}", current.raceTrackIsMirror, current.raceTotalTime, current.raceLapTime, delta, anchorValue));
 
   if (vars.raceIgnoreTimeDelta) {
     if (current.raceLapProgress == raceMaxLap && old.raceLapProgress == current.raceLapProgress - 1)
@@ -199,26 +278,26 @@ isLoading {
 }
 
 split {
+  /*
+    Rewire on how the flag are actually assigned.
+
+    userFlagCleared are updated after fading out from race screen.
+    * if bonus existed, clear flag will not be applied first
+  */
+
   if (game != null && vars.SUPER_NOISY_VERBOSE) print("split check");
 
   int actualTrackID = 255;
-  int moneyRequired = 0;
   bool isClearBonus = false;
 
-  int previousClearFlags = old.userFlagCleared | (old.userFlagClearedMirror << 8);
-  int currentClearFlags = current.userFlagCleared | (current.userFlagClearedMirror << 8);
+  int currentClearFlags = current.userFlagCleared;
+  bool currentTrackClearFlag = false;
 
-  if (game != null) {
+  if (current.raceLapProgress >= 0) {
     actualTrackID = current.raceTrackID | (current.raceTrackIsMirror ? 8 : 0);
+    currentTrackClearFlag = (currentClearFlags & (1 << actualTrackID)) != 0;
 
-    if (current.raceTrackIsBonus && current.raceLapProgress == 1 && old.raceLapProgress == 0) {
-      print(string.Format("Pop the Bonus Flag for Track {0}", actualTrackID));
-      isClearBonus = true;
-      vars.bonusTrackFlag[actualTrackID] = false;
-    } else if (!current.raceTrackIsBonus && current.raceLapProgress == 3 && old.raceLapProgress == 2 && current.racePosition == 1 && previousClearFlags != currentClearFlags) {
-      print(string.Format("Register Bonus Flag for Track {0}", actualTrackID));
-      vars.bonusTrackFlag[actualTrackID] = true;
-    }
+    isClearBonus = vars.fOnClearRace(actualTrackID);
   }
 
   if (settings["course_progression"]) {
@@ -227,31 +306,26 @@ split {
     var oldCleared = (old.userFlagCleared & trackBit) != 0;
     var currentCleared = (current.userFlagCleared & trackBit) != 0;
 
-    if (!vars.canUnlockCastleFlag && settings["bomber_castle_unlock_check"]) {
-      if ((current.userFlagUnlocked & (1 << 1)) == 0) moneyRequired +=  100;
-      if ((current.userFlagUnlocked & (1 << 2)) == 0) moneyRequired +=  400;
-      if ((current.userFlagUnlocked & (1 << 3)) == 0) moneyRequired +=  900;
-      if ((current.userFlagUnlocked & (1 << 4)) == 0) moneyRequired += 1500;
-      if ((current.userFlagUnlocked & (1 << 5)) == 0) moneyRequired += 3000;
-      if ((current.userFlagUnlocked & (1 << 6)) == 0) moneyRequired += 4600;
-
-      if (settings["use_hyper_louie"] && ((current.userFlagRides & (1 << 4)) == 0)) moneyRequired += 8000;
-
-      var canUnlockCastleOld     = old.userCredit >= moneyRequired;
-      var canUnlockCastleCurrent = current.userCredit >= moneyRequired;
-      if(canUnlockCastleCurrent && !canUnlockCastleOld && moneyRequired > 0) {
-        vars.canUnlockCastleFlag = true;
-        return true;
-      }
+    if (
+      !vars.canUnlockCastleFlag &&
+      settings["bomber_castle_unlock_check"] &&
+      vars.fOnUnlockableNormalCastle()
+    ) {
+      return true;
     }
 
     if (settings["split_on_bonus"]) {
       if (
         current.raceTrackIsBonus &&
-        isClearBonus
+        !currentTrackClearFlag && // make sure to not split on already cleared track
+        (isClearBonus || current.raceLapProgress < 0)
       ) return true;
     } else {
-      if (currentCleared && !oldCleared) return true;
+      if (
+        !current.raceTrackIsBonus &&
+        !currentTrackClearFlag &&
+        current.racePosition == 1
+      ) return true;
     }
   }
 
