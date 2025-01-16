@@ -10,6 +10,8 @@ startup {
   vars.SUPER_NOISY_VERBOSE = false;
 
   /* CONSTANTS */
+  vars.GAME_SERIAL = "SLUS-00823";
+
   // TRACK CONSTANTS
   vars.TR_CIRCUIT  = 0;
   vars.TR_COASTER  = 1;
@@ -172,6 +174,10 @@ update {
 
   if (vars.baseRAMAddress == IntPtr.Zero)
     return false;
+
+  byte[] gameSerial = new byte[10];
+  if(!memory.ReadBytes((IntPtr)vars.baseRAMAddress + 0x00ba94, 10, out gameSerial)) return false;
+  if(Encoding.Default.GetString(gameSerial) != vars.GAME_SERIAL) return false;
 
   // Not an accurate way to describe Title Screen.
   // This value also set anywhere else like during the race.
