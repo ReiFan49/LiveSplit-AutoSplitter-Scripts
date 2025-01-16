@@ -5,6 +5,7 @@ This repository stores collection of LiveSplit Autosplitters.
 ## Games
 
 - [Bomberman Fantasy Race (NTSC-U)](https://github.com/ReiFan49/LiveSplit-Autosplitter-Scripts/tree/psx/slus-00823) [PSX, SLUS-00823]
+- [Bakusou Kyoudai Let's & Go!! Eternal Wings (NTSC-J)](https://github.com/ReiFan49/LiveSplit-Autosplitter-Scripts/tree/psx/slps-01489) [PSX, SLPS-01489]
 
 ## Disclaimer
 
