@@ -119,7 +119,7 @@ update {
 gameTime {
   int delta = 0;
 
-  if (current.raceLapProgress >= 0 && old.raceLapProgress >= 0 && current.raceLapProgress <= vars.configLapTotal)
+  if (current.raceLapProgress >= 0 && old.raceLapProgress >= 0 && old.raceLapProgress <= vars.configLapTotal)
     delta = current.raceTotalTime - old.raceTotalTime;
 
   // This is doesn't seem to be a static memory usage, or
